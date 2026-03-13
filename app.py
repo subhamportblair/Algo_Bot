@@ -27,10 +27,12 @@ logs = []
 async def trading_loop():
     global straddle, running, nifty_spot, logs
     while True:
-        if running and straddle:
-            try:
-                # 1. Fetch Spot and Leg Prices
-                nifty_spot = om.get_nifty_spot()
+        try:
+            # Update spot price regardless of running state
+            nifty_spot = om.get_nifty_spot() or 0
+
+            if running and straddle:
+                # 1. Fetch Leg Prices
                 quotes = kite.ltp([f"NFO:{straddle.ce_symbol}", f"NFO:{straddle.pe_symbol}"])
                 ce_ltp = quotes.get(f"NFO:{straddle.ce_symbol}", {}).get("last_price", 0)
                 pe_ltp = quotes.get(f"NFO:{straddle.pe_symbol}", {}).get("last_price", 0)
@@ -44,8 +46,8 @@ async def trading_loop():
                 if straddle.check_exit(sl_limit, tp_limit):
                     logs.append(f"SL/TP Hit! P&L: {pnl}. Squaring off...")
                     square_off()
-            except Exception as e:
-                logging.error(f"Error in trading loop: {e}")
+        except Exception as e:
+            logging.error(f"Error in trading loop: {e}")
 
         await asyncio.sleep(1)
 
@@ -75,14 +77,21 @@ async def get_status():
     }
 
 @app.post("/start")
-async def start_strategy(offset_points: float = Form(0), offset_percentage: float = Form(0), sl: float = Form(-5000), tp: float = Form(10000), expiry_only: bool = Form(True)):
+async def start_strategy(
+    offset_points: float = Form(0),
+    offset_percentage: float = Form(0),
+    sl: float = Form(-5000),
+    tp: float = Form(10000),
+    expiry_only: str = Form("off")
+):
     global straddle, running, sl_limit, tp_limit, logs
+    is_expiry_only = (expiry_only == "on")
 
     sl_limit = sl
     tp_limit = tp
 
     try:
-        if expiry_only and not om.is_expiry_day():
+        if is_expiry_only and not om.is_expiry_day():
             return JSONResponse({"status": "error", "message": "Today is not expiry day. Disable 'Expiry Only' to proceed."})
 
         spot = om.get_nifty_spot()
@@ -93,6 +102,9 @@ async def start_strategy(offset_points: float = Form(0), offset_percentage: floa
         # Place Sell Orders (Short Straddle)
         ce_order = place_market_order(kite, ce_symbol, "NFO", kite.TRANSACTION_TYPE_SELL, 50)
         pe_order = place_market_order(kite, pe_symbol, "NFO", kite.TRANSACTION_TYPE_SELL, 50)
+
+        if not ce_order or not pe_order:
+             return JSONResponse({"status": "error", "message": "Failed to place one or more orders."})
 
         # Fetch Entry Prices
         quotes = kite.ltp([f"NFO:{ce_symbol}", f"NFO:{pe_symbol}"])
