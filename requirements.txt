@@ -1,0 +1,3 @@
+kiteconnect
+pytest
+python-dotenv
