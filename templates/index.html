@@ -25,10 +25,14 @@
                     <h2>Strategy Control</h2>
                     <form id="start-form">
                         <label>Strike Offset (Points)</label>
-                        <input type="number" name="offset_points" value="0">
+                        <div style="display: flex; gap: 5px; margin-bottom: 15px;">
+                            <button type="button" class="btn-primary" onclick="changeOffset(-100)" style="padding: 5px 15px;">-</button>
+                            <input type="number" id="offset_points" name="offset_points" value="400" style="margin-bottom: 0; text-align: center;">
+                            <button type="button" class="btn-primary" onclick="changeOffset(100)" style="padding: 5px 15px;">+</button>
+                        </div>
 
                         <label>Strike Offset (Percentage %)</label>
-                        <input type="number" name="offset_percentage" value="0" step="0.1">
+                        <input type="number" id="offset_percentage" name="offset_percentage" value="0" step="0.01" readonly style="background-color: #f5f5f5;">
 
                         <div style="margin-bottom: 15px;">
                             <input type="checkbox" name="expiry_only" id="expiry_only" checked style="width: auto; margin-bottom: 0;">
@@ -76,9 +80,30 @@
     </div>
 
     <script>
+        let niftySpot = 0;
+
+        function updatePercentage() {
+            const offsetPoints = parseFloat(document.getElementById('offset_points').value) || 0;
+            if (niftySpot > 0) {
+                const percentage = (offsetPoints / niftySpot) * 100;
+                document.getElementById('offset_percentage').value = percentage.toFixed(2);
+            }
+        }
+
+        function changeOffset(val) {
+            const el = document.getElementById('offset_points');
+            el.value = parseInt(el.value) + val;
+            updatePercentage();
+        }
+
+        document.getElementById('offset_points').oninput = updatePercentage;
+
         async function updateStatus() {
             const res = await fetch('/status');
             const data = await res.json();
+
+            niftySpot = data.nifty_spot;
+            updatePercentage();
 
             document.getElementById('login-link').href = data.login_url;
             document.getElementById('nifty-spot').innerText = data.nifty_spot;

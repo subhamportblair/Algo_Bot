@@ -11,7 +11,7 @@ def place_market_order(kite, symbol, exchange, transaction_type, quantity):
             tradingsymbol=symbol,
             transaction_type=transaction_type,
             quantity=quantity,
-            product=kite.PRODUCT_MIS,
+            product=kite.PRODUCT_NRML,
             order_type=kite.ORDER_TYPE_MARKET
         )
         logging.info(f"Order placed successfully. ID: {order_id}")
