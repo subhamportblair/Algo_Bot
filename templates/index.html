@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Nifty Straddle Bot</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <div class="logo">Kite Algobot</div>
+        <div style="display: flex; gap: 20px; align-items: center;">
+            <div id="auth-section" style="display: flex; gap: 10px; align-items: center;">
+                <a href="#" id="login-link" target="_blank" style="text-decoration: none; color: #387ed1; font-size: 14px; font-weight: 600;">Login</a>
+                <input type="text" id="request-token-input" placeholder="Request Token" style="width: 150px; margin-bottom: 0; padding: 5px;">
+                <button id="auth-btn" class="btn-primary" style="padding: 5px 10px; font-size: 12px;">Auth</button>
+            </div>
+            <div id="connection-status" class="positive">● Online</div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="flex">
+            <div class="col-1">
+                <div class="card">
+                    <h2>Strategy Control</h2>
+                    <form id="start-form">
+                        <label>Strike Offset (Points)</label>
+                        <input type="number" name="offset_points" value="0">
+
+                        <label>Strike Offset (Percentage %)</label>
+                        <input type="number" name="offset_percentage" value="0" step="0.1">
+
+                        <div style="margin-bottom: 15px;">
+                            <input type="checkbox" name="expiry_only" id="expiry_only" checked style="width: auto; margin-bottom: 0;">
+                            <label for="expiry_only" style="display: inline; margin-left: 5px;">Trade on Expiry Day Only</label>
+                        </div>
+
+                        <label>Stop Loss (Total P&L)</label>
+                        <input type="number" name="sl" value="-5000">
+
+                        <label>Take Profit (Total P&L)</label>
+                        <input type="number" name="tp" value="10000">
+
+                        <button type="submit" class="btn-primary" style="width: 100%;">Deploy Straddle</button>
+                    </form>
+                    <button id="squareoff-btn" class="btn-danger" style="width: 100%; margin-top: 10px;">Exit Strategy (Square Off)</button>
+                </div>
+            </div>
+
+            <div class="col-2">
+                <div class="card">
+                    <h2>Live Dashboard</h2>
+                    <div class="status-bar">
+                        <div class="label-value">NIFTY 50: <span id="nifty-spot" class="val">-</span></div>
+                        <div class="label-value">Status: <span id="bot-status" class="val">Idle</span></div>
+                    </div>
+
+                    <div style="text-align: center; margin: 40px 0;">
+                        <div id="pnl-display" class="pnl-value">₹ 0.00</div>
+                        <div style="color: #999; font-size: 14px;">Total Unrealized P&L</div>
+                    </div>
+
+                    <div class="flex">
+                        <div class="col-1">
+                            <div class="label-value">CE Leg: <span id="ce-symbol" class="val">-</span></div>
+                            <div class="label-value">LTP: <span id="ce-ltp" class="val">0.00</span></div>
+                        </div>
+                        <div class="col-1">
+                            <div class="label-value">PE Leg: <span id="pe-symbol" class="val">-</span></div>
+                            <div class="label-value">LTP: <span id="pe-ltp" class="val">0.00</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function updateStatus() {
+            const res = await fetch('/status');
+            const data = await res.json();
+
+            document.getElementById('login-link').href = data.login_url;
+            document.getElementById('nifty-spot').innerText = data.nifty_spot;
+            document.getElementById('bot-status').innerText = data.running ? 'Running' : 'Idle';
+            document.getElementById('ce-symbol').innerText = data.ce_symbol;
+            document.getElementById('pe-symbol').innerText = data.pe_symbol;
+            document.getElementById('ce-ltp').innerText = data.ce_ltp.toFixed(2);
+            document.getElementById('pe-ltp').innerText = data.pe_ltp.toFixed(2);
+
+            const pnlDisplay = document.getElementById('pnl-display');
+            pnlDisplay.innerText = '₹ ' + data.pnl.toFixed(2);
+            pnlDisplay.className = 'pnl-value ' + (data.pnl >= 0 ? 'positive' : 'negative');
+        }
+
+        document.getElementById('start-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new URLSearchParams(new FormData(e.target));
+            const res = await fetch('/start', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if(data.status === 'success') alert('Strategy Started!');
+            else alert('Error: ' + data.message);
+        };
+
+        document.getElementById('auth-btn').onclick = async () => {
+            const token = document.getElementById('request-token-input').value;
+            const res = await fetch('/auth', {
+                method: 'POST',
+                body: new URLSearchParams({ request_token: token })
+            });
+            const data = await res.json();
+            if(data.status === 'success') alert('Auth Successful!');
+            else alert('Auth Failed: ' + data.message);
+        };
+
+        document.getElementById('squareoff-btn').onclick = async () => {
+            if(confirm('Are you sure you want to exit all positions?')) {
+                await fetch('/squareoff', { method: 'POST' });
+                alert('Squaring off...');
+            }
+        };
+
+        setInterval(updateStatus, 1000);
+    </script>
+</body>
+</html>
