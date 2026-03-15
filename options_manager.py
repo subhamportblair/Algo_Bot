@@ -59,12 +59,19 @@ class OptionsManager:
 
         for i in self.instruments:
             if i['name'] == 'NIFTY' and i['expiry'] == expiry:
-                if i['strike'] == ce_strike and i['instrument_type'] == 'CE':
+                if ce_strike and i['strike'] == ce_strike and i['instrument_type'] == 'CE':
                     ce_symbol = i['tradingsymbol']
-                elif i['strike'] == pe_strike and i['instrument_type'] == 'PE':
+                elif pe_strike and i['strike'] == pe_strike and i['instrument_type'] == 'PE':
                     pe_symbol = i['tradingsymbol']
 
-            if ce_symbol and pe_symbol:
+            if (not ce_strike or ce_symbol) and (not pe_strike or pe_symbol):
                 break
 
         return ce_symbol, pe_symbol
+
+    def get_atm_options(self):
+        """Returns ATM CE and PE symbols for nearest expiry."""
+        spot = self.get_nifty_spot()
+        atm_strike = round(spot / 50) * 50
+        expiry = self.get_nearest_expiry()
+        return self.get_option_symbols(expiry, atm_strike, atm_strike)

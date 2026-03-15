@@ -19,10 +19,15 @@
     </header>
 
     <div class="container">
-        <div class="flex">
+        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <button class="btn-primary" onclick="showTab('straddle')">Straddle Strategy</button>
+            <button class="btn-primary" onclick="showTab('scalping')">Scalping Strategy</button>
+        </div>
+
+        <div id="straddle-tab" class="flex strategy-tab">
             <div class="col-1">
                 <div class="card">
-                    <h2>Strategy Control</h2>
+                    <h2>Straddle Control</h2>
                     <form id="start-form">
                         <label>Strike Offset (Points)</label>
                         <div style="display: flex; gap: 5px; margin-bottom: 15px;">
@@ -77,9 +82,59 @@
                 </div>
             </div>
         </div>
+
+        <div id="scalping-tab" class="flex strategy-tab" style="display: none;">
+            <div class="col-1">
+                <div class="card">
+                    <h2>Scalping Control</h2>
+                    <form id="scalping-start-form">
+                        <label>Quantity (Lots)</label>
+                        <input type="number" name="qty_lots" value="1">
+
+                        <label>Stop Loss (Points)</label>
+                        <input type="number" name="scalp_sl" value="5">
+
+                        <label>Target (Points)</label>
+                        <input type="number" name="scalp_target" value="10">
+
+                        <button type="submit" class="btn-primary" style="width: 100%;">Start Scalping</button>
+                    </form>
+                    <button id="scalp-stop-btn" class="btn-danger" style="width: 100%; margin-top: 10px;">Stop Scalping</button>
+                </div>
+            </div>
+
+            <div class="col-2">
+                <div class="card">
+                    <h2>Scalping Dashboard</h2>
+                    <div class="status-bar">
+                        <div class="label-value">NIFTY 50: <span class="nifty-spot-val">-</span></div>
+                        <div class="label-value">Status: <span id="scalp-status" class="val">Idle</span></div>
+                    </div>
+
+                    <div style="text-align: center; margin: 40px 0;">
+                        <div id="scalp-pnl" class="pnl-value">₹ 0.00</div>
+                        <div style="color: #999; font-size: 14px;">Active Trade P&L</div>
+                    </div>
+
+                    <div class="flex">
+                        <div class="col-1">
+                            <div class="label-value">Active Leg: <span id="scalp-symbol" class="val">-</span></div>
+                            <div class="label-value">Entry: <span id="scalp-entry" class="val">0.00</span></div>
+                        </div>
+                        <div class="col-1">
+                            <div class="label-value">Current LTP: <span id="scalp-ltp" class="val">0.00</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
+        function showTab(strategy) {
+            document.querySelectorAll('.strategy-tab').forEach(t => t.style.display = 'none');
+            document.getElementById(strategy + '-tab').style.display = 'flex';
+        }
         let niftySpot = 0;
 
         function updatePercentage() {
@@ -106,7 +161,12 @@
             updatePercentage();
 
             document.getElementById('login-link').href = data.login_url;
+
+            // Common
+            document.querySelectorAll('.nifty-spot-val').forEach(el => el.innerText = data.nifty_spot);
             document.getElementById('nifty-spot').innerText = data.nifty_spot;
+
+            // Straddle
             document.getElementById('bot-status').innerText = data.running ? 'Running' : 'Idle';
             document.getElementById('ce-symbol').innerText = data.ce_symbol;
             document.getElementById('pe-symbol').innerText = data.pe_symbol;
@@ -116,6 +176,16 @@
             const pnlDisplay = document.getElementById('pnl-display');
             pnlDisplay.innerText = '₹ ' + data.pnl.toFixed(2);
             pnlDisplay.className = 'pnl-value ' + (data.pnl >= 0 ? 'positive' : 'negative');
+
+            // Scalping
+            document.getElementById('scalp-status').innerText = data.scalp.running ? 'Running' : 'Idle';
+            document.getElementById('scalp-symbol').innerText = data.scalp.symbol;
+            document.getElementById('scalp-entry').innerText = data.scalp.entry_price.toFixed(2);
+            document.getElementById('scalp-ltp').innerText = data.scalp.ltp.toFixed(2);
+
+            const scalpPnlDisplay = document.getElementById('scalp-pnl');
+            scalpPnlDisplay.innerText = '₹ ' + data.scalp.pnl.toFixed(2);
+            scalpPnlDisplay.className = 'pnl-value ' + (data.scalp.pnl >= 0 ? 'positive' : 'negative');
         }
 
         document.getElementById('start-form').onsubmit = async (e) => {
@@ -139,6 +209,25 @@
             const data = await res.json();
             if(data.status === 'success') alert('Auth Successful!');
             else alert('Auth Failed: ' + data.message);
+        };
+
+        document.getElementById('scalping-start-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new URLSearchParams(new FormData(e.target));
+            const res = await fetch('/scalp/start', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if(data.status === 'success') alert('Scalping Started!');
+            else alert('Error: ' + data.message);
+        };
+
+        document.getElementById('scalp-stop-btn').onclick = async () => {
+            if(confirm('Stop scalping and exit active trade?')) {
+                await fetch('/scalp/stop', { method: 'POST' });
+                alert('Scalping stopped.');
+            }
         };
 
         document.getElementById('squareoff-btn').onclick = async () => {
